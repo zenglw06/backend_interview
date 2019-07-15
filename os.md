@@ -30,16 +30,202 @@
     - 可能要扩展到多机分布的用进程，多核分布的用线程
 + **<font size = 5>进程的五状态模型</font>**
 
+    ![avatar](./imgs/process_states.jpg)
+
+
+    -   创建态：向进程申请一个空白的PCB(process control block),并向PCB中填写用于控制和管理进程的信息，为该进程分配运行时所必须的资源
+
+    -   就绪态：进程已处于准备好的状态，及进程已经分配到所需的系统资源，只要获得CPU就可以执行
+    -   执行态：进程获得CPU正在执行
+    -   阻塞态：正在执行的进程，在执行过程中需要等待其它资源的到达，如：I/O请求，申请缓冲区失败等
+    -   终止态：进程结束
+
+
 + **<font size = 5>进程间的通信方式以及优缺点</font>**
 
+    主要包括无名管道，有名管道，信号，消息队列，共享内存，信号量和套接字
 
-+ **<font size = 5>进程之间私有和共享的资源</font>**
+    1.  无名管道
+        -   半双工的，具有固定的读端和写端
+        -   它只能用于具有亲缘关系的进程之间的通信
+        -   是一种特殊的文件， 不属于文件系统，只存在于内存中
+        使用例子如下
+        ```
+        #include<stdio.h>
+        #include<unistd.h>
+        int main()
+        {
+            int fd[2];  // 两个文件描述符
+            pid_t pid;
+            char buff[20];
+
+            if(pipe(fd) < 0)  // 创建管道
+                printf("Create Pipe Error!\n"); 
+            if((pid = fork()) < 0)  // 创建子进程
+                printf("Fork Error!\n");
+            else if(pid > 0)  // 父进程
+            {
+                close(fd[0]); // 关闭读端
+                write(fd[1], "hello world\n", 12);
+            }
+            else
+            {
+                close(fd[1]); // 关闭写端
+                read(fd[0], buff, 20);
+                printf("%s", buff);
+            }
+ 
+            return 0;
+        }
+        ```
+    2.  有名管道
+        -   无关进程之间也可以交换数据
+        -   它以一种特殊的设备文件形式存在系统中
+        有名管道的通信类似于进程中使用文件来传输交换数据，在数据读出时，同时会清除数据，并且先进先出。以下两份代码演示不同进程间使用有名管道的通信方式
+        ```
+        //write_fifo.c
+        #include<stdio.h>
+        #include<stdlib.h>   // exit
+        #include<fcntl.h>    // O_WRONLY
+        #include<sys/stat.h>
+        #include<time.h>     // time
+        int main()
+        {
+            int fd;
+            int n, i;
+            char buf[1024];
+            time_t tp;
+
+            printf("I am %d process.\n", getpid()); // 说明进程ID
+            if((fd = open("fifo1", O_WRONLY)) < 0) // 以写打开一个FIFO 
+            {
+                perror("Open FIFO Failed");
+                exit(1);
+            }
+ 
+            for(i=0; i<10; ++i)
+            {
+                time(&tp);  // 取系统当前时间
+                n=sprintf(buf,"Process %d's time is %s",getpid(),ctime(&tp));
+                printf("Send message: %s", buf); // 打印
+                if(write(fd, buf, n+1) < 0)  // 写入到FIFO中
+                {
+                    perror("Write FIFO Failed");
+                    close(fd);
+                    exit(1);
+                }
+                sleep(1);  // 休眠1秒
+            }
+            close(fd);  // 关闭FIFO文件
+            return 0;
+        }
+        ```
+        ```
+        //read_fifo.c
+        #include<stdio.h>
+        #include<stdlib.h>
+        #include<errno.h>
+        #include<fcntl.h>
+        #include<sys/stat.h>
+        int main()
+        {
+            int fd;
+            int len;
+            char buf[1024];
+            if(mkfifo("fifo1", 0666) < 0 && errno!=EEXIST) // 创建FIFO管道
+                perror("Create FIFO Failed");
+
+            if((fd = open("fifo1", O_RDONLY)) < 0)  // 以读打开FIFO
+            {
+                perror("Open FIFO Failed");
+                exit(1);
+            }
+            while((len = read(fd, buf, 1024)) > 0) // 读取FIFO管道
+                printf("Read message: %s", buf);
+            close(fd);  // 关闭FIFO文件
+            return 0;
+        }
+        ```
 
 
-+ **<font size = 5>线程间的通信方式以及优缺点</font>**
+    3.  消息队列
 
-+ **<font size = 5>线程之间私有和共享的资源</font>**
+        消息队列是消息的链接表，存放在内核中
+        -   消息队列是面向记录的，其中的消息具有特定的格式以及特定的优先级
+        -   消息队列独立于发生和接收进程。进程终止时，消息队列及其内容不会被删除
+        -   消息队列可以实现消息的**随机查询**，消息不一定要以先进先出的次序读取
 
+        函数原型
+        ```
+        #include <sys/msg.h>
+        // 创建或打开消息队列：成功返回队列ID，失败返回-1
+        int msgget(key_t key, int flag);
+        // 添加消息：成功返回0，失败返回-1
+        int msgsnd(int msqid, const void *ptr, size_t size, int flag);
+        // 读取消息：成功返回消息数据的长度，失败返回-1
+        int msgrcv(int msqid, void *ptr, size_t size, long type,int flag);
+        // 控制消息队列：成功返回0，失败返回-1
+        int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+        ```
+    4. 信号量
+
+        它是一个计数器，主要用于进程间的互斥和同步，而不是用于存储进程间通信数据
+
+        -   信号量用于进程间同步，若要在进程间传递数据需要结合共享内存
+        -   信号量基于操作系统的PV操作，程序对信号量的操作都是原子操作
+
+        最简单的信号量是只能取 0 和 1 的变量，这也是信号量最常见的一种形式，叫做二值信号量（Binary Semaphore）。而可以取多个正整数的信号量被称为通用信号量。Linux 下的信号量函数都是在通用的信号量数组上进行操作，而不是在一个单一的二值信号量上进行操作。
+        ```
+        #include <sys/sem.h>
+        // 创建或获取一个信号量组：若成功返回信号量集ID，失败返回-1
+        int semget(key_t key, int num_sems, int sem_flags);
+        // 对信号量组进行操作，改变信号量的值：成功返回0，失败返回-1
+        int semop(int semid, struct sembuf semoparray[], size_t numops);  
+        // 控制信号量的相关信息
+        int semctl(int semid, int sem_num, int cmd, ...);
+        ```
+
+    5.  共享内存
+
+        共享内存指两个或多个进程共享一个给定的存储区
+        -   共享内存是最快的一种 IPC，因为进程是直接对内存进行存取。
+        -   因为多个进程可以同时操作，所以需要进行同步。
+        -   信号量+共享内存通常结合在一起使用，信号量用来同步对共享内存的访问。
+
+    6.  套接字
+    
+        它用于不同机器之间进程的通信
+    
+
+    各种进程间通信方式对比优缺点
+
+
+    | 通信方式| 优缺点|
+    | :----------| :--------- |
+    |无名管道|速度慢，容量有限，只有父子进程能通讯|
+    |有名管道|任何进程间都能通讯，但速度慢|
+    |消息队列|容量受到系统限制，且要注意第一次读的时候，要考虑上一次没有读完数据的问题，消息队列可以不再局限于父子进程，而允许任意进程通过共享消息队列来实现进程间通信，并由系统调用函数来实现消息发送和接收之间的同步，从而使得用户在使用消息缓冲进行通信时不再需要考虑同步问题，使用方便，但是信息的复制需要额外消耗CPU的时间，不适宜于信息量大或操作频繁的场合。**此种方法不太常用**|
+    |信号量|不能用来传递复杂消息，只能用来同步|
+    |共享内存|利用内存缓冲区直接交换信息，无须复制，快捷、信息量大是其优点。共享内存块提供了在任意数量的进程之间进行高效双向通信的机制。每个使用者都可以读取写入数据，但是所有程序之间必须达成并遵守一定的协议，以防止诸如在读取信息之前覆写内存空间等竞争状态的出现。|
+
+
+    通信方式的选择
+
+    -   PIPE和FIFO(有名管道)用来实现进程间相互发送非常短小的、频率很高的消息，这两种方式通常适用于两个进程间的通信
+    -   共享内存用来实现进程间共享的、非常庞大的、读写操作频率很高的数据；这种方法适用于多进程间的通信
+    -   其他考虑用socket。主要应用在分布式开发中
+
+
+
+
++ **<font size = 5>线程间的通信方式</font>**
+
+
+    线程间通信主要用于线程同步，所以线程没有像进程通信中的用于数据交换的通信机制
+    -   锁机制：包括互斥锁，条件变量，读写锁；互斥锁提供了排它方式方式数据被并发的修改，读写锁允许多个线程同时读取共享数据，而对写操作是互斥的。条件变量可以以原子的方式阻塞线程，知道某个条件为真
+
+    -   信号量机制
+    -   信号机制
 
 
 
@@ -48,4 +234,17 @@
 
 + **<font size = 5>页面置换算法</font>**
 
+
+    在地址映射过程中，若在页面中发现所要访问的页面不在内存中，则产生缺页中断。当缺页中断时，如果操作系统中内存中没有空闲页面，则操作系统必须在内存选择一个页面将其移除内存，以便为即将调入的页面让出空间。主要包括有以下几种页面置换算法
+
+    -   最佳置换算法
+    -   先进先出置换算法
+    -   最近最久未使用算法
+    -   时钟置换算法
+
+
 + **<font size = 5>什么是协程？</font>**
+
+
+
+
