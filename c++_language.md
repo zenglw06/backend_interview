@@ -391,4 +391,84 @@
 
 +   **<font size =5>STL库的分配器allocator</font>**
 
-    allocator是一个由两级分配器构成的内存管理，当申请的内存大小**大于**128byte时，就启动第一级分配器通过malloc直接向系统的堆空间分配，如果申请的内存大小**小于**128byte时，就启动第二级分配器从一个预先分配好的内存池中取一块内存交付给用户，这个内存池由16个不同大小（8的倍数，8~128byte）的空闲列表组成,allocator 会根据内存的大小（将内存大小round up成8的倍数），从对应的空闲列表取表头块给用户
+    allocator是一个由两级分配器构成的内存管理，当申请的内存大小**大于**128byte时，就启动第一级分配器通过malloc直接向系统的堆空间分配。
+    
+    如果申请的内存大小**小于**128byte时，就启动第二级分配器从一个预先分配好的内存池中取一块内存交付给用户，用一个union obj数组free_list来存储内存的地址，数组的每一个元素都指向一个obj链表，也就是内存链表。数组从小到大表示负责8byte,16byte,24byte,...,120byte,128byte内存请求。当请求的内存为n时，会将请求上条至2的指数大小，并从数组相应位置获取内存。例如如果请求为20b，则请求会上调至24b 。第二级配置器多了一些机制，避免太多小额区块造成内存泄漏
+
+
++   **<font size = 5>联合体union</font>**
+
+    当多个数据需要共享内存或者多个数据每次只取其一时，可以利用联合体(union)，**联合体中数据是共享相同的存储空间，各种变量名都可以同时使用，操作也是共同生效**
+
+    -   联合体是一个结构体
+    -   它的所有成员相对于基地址的偏移量都为0
+    -   此结构空间要大到足够容纳最"宽"的成员
+    -   其内存对齐方式要适合其中所有的成员
+
+    联合体大小满足下面两个条件
+
+    -   大小足够容纳最宽的成员
+    -   大小能被其包含的所有**基本数据类型**的大小所整除
+
+    ```
+    #include<iostream>  
+    using namespace std;
+
+    int main() {
+	    union U1 {
+		    int n;
+		    char s[11];
+		    double d;
+	    };
+	    union U2 {
+		    int n;
+		    char s[5];
+		    double d;
+	    };
+	    U1 u1;
+	    U2 u2;
+	    cout << sizeof(u1) << '\t' << sizeof(u2) << endl;
+        //输出16  8
+	    cout << "u1各数据地址:\n" << &u1 << '\t' << &u1.d << '\t' << &u1.s << '\t' << &u1.n << endl;
+        //0x7fffd92a1e00  0x7fffd92a1e00  0x7fffd92a1e00  0x7fffd92a1e00
+	    cout << "u2各数据地址:\n" << &u2 << '\t' << &u2.d << '\t' << &u2.s << '\t' << &u2.n << endl;
+	    // 0x7fffd92a1df8  0x7fffd92a1df8  0x7fffd92a1df8  0x7fffd92a1df8
+        return 0;
+    }
+    ```
+
+    为了说明union的使用举一个具体的程序例子
+    
+    ```
+    #include<iostream>  
+    using namespace std;
+
+    int main() {
+	    union U {
+		unsigned int n;
+		unsigned char s[4];
+	    };
+	    U u;
+	    u.n = 0xf1f2f3f4;
+	    cout << "数值大小：" << hex << u.n << '\t' << "地址：" << &u.n << endl;
+	    cout << "数值大小：" << hex << (int)u.s[0] << '\t' << "地址：" << (void*)&u.s[0] << endl;
+	    cout << "数值大小：" << hex << (int)u.s[1] << '\t' << "地址：" << (void*)&u.s[1] << endl;
+	    cout << "数值大小：" << hex << (int)u.s[2] << '\t' << "地址：" << (void*)&u.s[2] << endl;
+	    cout << "数值大小：" << hex << (int)u.s[3] << '\t' << "地址：" << (void*)&u.s[3] << endl;
+	    return 0;
+    }
+    ```
+    输出内容如下
+
+    ```
+    数值大小：f1f2f3f4      地址：0x7ffff5de4b94
+    数值大小：f4    地址：0x7ffff5de4b94
+    数值大小：f3    地址：0x7ffff5de4b95
+    数值大小：f2    地址：0x7ffff5de4b96
+    数值大小：f1    地址：0x7ffff5de4b97
+    ```
+    他们都是放在同一个地方，所以才会有偏移量为0的说法，你对例子中的n改值，对应的char类型的内容都会改变
+
++   **<font size = 5>struct内存对齐</font>**
+
+
