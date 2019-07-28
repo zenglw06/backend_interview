@@ -471,4 +471,10 @@
 
 +   **<font size = 5>struct内存对齐</font>**
 
+    三个规则
+
+    -   结构的数据成员，第一个数据成员放在offset为0的地方，以后每个数据成员存储的起始位置: min(#pragma pack()指定的数,这个数据成员的自身长度)的倍数
+    -   如果一个结构里有某些结构体成员，则结构体成员要从min(#pragram pack() , 内部长度最长的数据成员)的整数倍地址开始存储。（struct a里存有struct b，b里有char，int，double等元素，那b应该从min(#pragram pack(), 8)的整数倍开始存储。）
+    -   结构体的总大小，也就是sizeof的结果，必须是 min(#pragram pack() , 长度最长的数据成员) 的整数倍#pragram pack() 默认为4(32位), 8(64位)
+
 
