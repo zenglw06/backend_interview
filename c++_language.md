@@ -478,3 +478,4 @@
     -   结构体的总大小，也就是sizeof的结果，必须是 min(#pragram pack() , 长度最长的数据成员) 的整数倍#pragram pack() 默认为4(32位), 8(64位)
 
 
++   **<font size = 5>c++类内存模型</font>**

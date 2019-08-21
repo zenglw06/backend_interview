@@ -149,3 +149,27 @@
         
     ![avatar](./imgs/https_connect.jpg)
 
+
++   **<font size = 5>一次HTTP完整的过程</font>**
+
+    -   首先是建立TCP连接，三次握手
+    -   web浏览器向web服务器发送请求命令
+    -   web浏览器发送请求头信息，如user-agent,connection(keep alive),cache
+    -   web服务器应答，应答第一部分是版本号和协议状态码
+    -   web服务器发送应答头信息
+    -   web服务器发送数据
+    -   关闭TCP连接
+    
+    常见的请求头部信息
+    
+    ![avatar](./imgs/http_head.png)
+
+    常见的响应状态码包括这几个
+
+    1xx：指示信息--表示请求已接收，继续处理。
+    2xx：成功--表示请求已被成功接收、理解、接受。
+    3xx：重定向--要完成请求必须进行更进一步的操作。
+    4xx：客户端错误--请求有语法错误或请求无法实现。
+    5xx：服务器端错误--服务器未能实现合法的请求。
+
+    ![avatar](./imgs/http_status.png)
